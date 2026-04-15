@@ -1,397 +1,331 @@
 /**
- * Mapa Político — map.js
- * Lógica principal: inicialización de Leaflet, carga de GeoJSON,
- * interactividad (hover/click) y consulta a la Wikibase REST API.
+ * Mapa Político — map.js  (v2)
  *
- * Stack: Leaflet 1.9.4 + Bootstrap 5 Offcanvas + Wikidata API
+ * Filosofía: simple y funcional primero.
+ * El mapa base y el GeoJSON deben renderizar sin errores
+ * antes de agregar capas de complejidad.
  */
 
 'use strict';
 
-/* ══════════════════════════════════════════════════════
-   CONFIGURACIÓN GLOBAL
-══════════════════════════════════════════════════════ */
-const CONFIG = {
-  geojsonUrl: 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
-  wikidataApi: 'https://www.wikidata.org/w/rest.php/wikibase/v1',
-  mapCenter: [20, 0],
-  mapZoom: 2,
-  mapMinZoom: 2,
-  // QIDs de propiedades Wikidata que consultaremos
-  props: {
-    headOfState:    'P35',
-    headOfGovt:     'P6',
-    govtForm:       'P122',
-    capital:        'P36',
-    population:     'P1082',
-    officialLangs:  'P37',
-    isoCode:        'P297',
-  }
+/* ══════════════════════════════════════════════
+   CONFIGURACIÓN CENTRAL
+══════════════════════════════════════════════ */
+const GEOJSON_URL   = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+const WIKIDATA_API  = 'https://www.wikidata.org/w/rest.php/wikibase/v1';
+
+const STYLE_DEFAULT = { color: '#336699', weight: 0.8, fillColor: '#6a9fcf', fillOpacity: 0.5 };
+const STYLE_HOVER   = { color: '#c0392b', weight: 2,   fillColor: '#e8a838', fillOpacity: 0.8 };
+const STYLE_ACTIVE  = { color: '#7b241c', weight: 2.5, fillColor: '#e74c3c', fillOpacity: 0.85 };
+
+const WIKIDATA_PROPS = {
+  govtForm:    'P122',
+  headOfState: 'P35',
+  headOfGovt:  'P6',
+  capital:     'P36',
+  officialLang:'P37',
+  population:  'P1082',
 };
 
-/* ══════════════════════════════════════════════════════
-   INICIALIZACIÓN DEL MAPA
-══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   PASO 1 — Inicializar mapa Leaflet en #map
+══════════════════════════════════════════════ */
 const map = L.map('map', {
-  center: CONFIG.mapCenter,
-  zoom: CONFIG.mapZoom,
-  minZoom: CONFIG.mapMinZoom,
-  zoomControl: true,
-  attributionControl: true,
+  center:  [20, 10],
+  zoom:    2,
+  minZoom: 2,
+  maxZoom: 10,
+  worldCopyJump: true,   // tiles continúan al desplazar horizontalmente
 });
 
-// Capa base: tiles de CartoDB (sin etiquetas intrusivas, buen contraste)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-  subdomains: 'abcd',
+/* ══════════════════════════════════════════════
+   PASO 2 — Capa base OpenStreetMap
+══════════════════════════════════════════════ */
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
 }).addTo(map);
 
-/* ══════════════════════════════════════════════════════
-   ESTADO DE LA APLICACIÓN
-══════════════════════════════════════════════════════ */
-let geojsonLayer   = null;
-let activeLayer    = null;   // País actualmente seleccionado
-let countryPanel   = null;   // Instancia Bootstrap Offcanvas
+/* ══════════════════════════════════════════════
+   ESTADO
+══════════════════════════════════════════════ */
+let activeLayer    = null;
+let panelInstance  = null;   // Bootstrap Offcanvas (lazy)
 
-/* ══════════════════════════════════════════════════════
-   ESTILOS DE CAPAS
-══════════════════════════════════════════════════════ */
-const style = {
-  default: {
-    fillColor:   '#4a6fa5',
-    fillOpacity: 0.6,
-    color:       '#2c3e50',
-    weight:      0.5,
-  },
-  hover: {
-    fillColor:   '#e8a838',
-    fillOpacity: 0.85,
-    color:       '#c0392b',
-    weight:      1.5,
-  },
-  active: {
-    fillColor:   '#e74c3c',
-    fillOpacity: 0.8,
-    color:       '#922b21',
-    weight:      2,
-  },
-};
+/* ══════════════════════════════════════════════
+   PASO 3 — Cargar GeoJSON con fetch()
+══════════════════════════════════════════════ */
+fetch(GEOJSON_URL)
+  .then(function(response) {
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    return response.json();
+  })
+  .then(function(geojsonData) {
+    renderGeoJSON(geojsonData);   // PASO 4
+  })
+  .catch(function(err) {
+    console.error('[MapaPolitico] Error GeoJSON:', err);
+    document.getElementById('map').insertAdjacentHTML('beforeend',
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+      'background:#fff;padding:1rem 2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:9999;">' +
+      '⚠️ No se pudo cargar el mapa. Verifica tu conexión.</div>'
+    );
+  });
 
-/* ══════════════════════════════════════════════════════
-   CARGA DEL GEOJSON
-══════════════════════════════════════════════════════ */
-async function loadGeoJSON() {
-  try {
-    const res = await fetch(CONFIG.geojsonUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    renderGeoJSON(data);
-  } catch (err) {
-    console.error('[MapaPolitico] Error cargando GeoJSON:', err);
-    showMapError('No se pudo cargar el mapa de países. Verifica tu conexión.');
-  }
-}
-
-/* ══════════════════════════════════════════════════════
-   RENDERIZADO DEL GEOJSON
-══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   PASO 4 — Renderizar polígonos con L.geoJSON()
+══════════════════════════════════════════════ */
 function renderGeoJSON(data) {
-  geojsonLayer = L.geoJSON(data, {
-    style: () => style.default,
-    onEachFeature: (feature, layer) => {
-      bindCountryEvents(feature, layer);
+  L.geoJSON(data, {
+
+    style: function() {
+      return Object.assign({}, STYLE_DEFAULT);
     },
+
+    onEachFeature: function(feature, layer) {
+      var props = feature.properties;
+      var name  = props.ADMIN  || props.name || 'Desconocido';
+      var iso2  = props.ISO_A2 || '';
+      var iso3  = props.ISO_A3 || '';
+
+      setupCountryLayer(layer, name, iso2, iso3);
+    }
+
   }).addTo(map);
 }
 
-/* ══════════════════════════════════════════════════════
-   EVENTOS POR PAÍS
-══════════════════════════════════════════════════════ */
-function bindCountryEvents(feature, layer) {
-  const props        = feature.properties;
-  const countryName  = props.ADMIN   || props.name || 'País desconocido';
-  const iso3         = props.ISO_A3  || '';
-  const iso2         = props.ISO_A2  || '';
+/* ══════════════════════════════════════════════
+   PASO 5 — Eventos por país
+══════════════════════════════════════════════ */
+function setupCountryLayer(layer, name, iso2, iso3) {
 
-  // ── Tooltip en hover ──────────────────────────────
-  layer.bindTooltip(buildTooltipHTML(countryName, iso2), {
+  /* — Tooltip en hover (sigue el cursor) — */
+  var flag = iso2 ? toFlagEmoji(iso2) : '';
+  layer.bindTooltip(flag + ' <strong>' + name + '</strong>', {
     sticky:    true,
     direction: 'top',
-    offset:    [0, -4],
-    className: 'country-tooltip',
     opacity:   1,
+    className: 'country-tooltip',
   });
 
-  // ── Mouse over ────────────────────────────────────
-  layer.on('mouseover', function (e) {
+  /* — mouseover: resaltar — */
+  layer.on('mouseover', function() {
     if (this !== activeLayer) {
-      this.setStyle(style.hover);
+      this.setStyle(STYLE_HOVER);
+      this.bringToFront();
     }
-    this.openTooltip(e.latlng);
   });
 
-  // ── Mouse out ─────────────────────────────────────
-  layer.on('mouseout', function () {
+  /* — mouseout: restaurar — */
+  layer.on('mouseout', function() {
     if (this !== activeLayer) {
-      this.setStyle(style.default);
+      this.setStyle(STYLE_DEFAULT);
     }
-    this.closeTooltip();
   });
 
-  // ── Click: abrir panel con datos de Wikidata ──────
-  layer.on('click', function () {
-    // Resetear estilo del país previamente activo
+  /* — click: abrir panel Offcanvas — */
+  layer.on('click', function() {
     if (activeLayer && activeLayer !== this) {
-      activeLayer.setStyle(style.default);
+      activeLayer.setStyle(STYLE_DEFAULT);
     }
     activeLayer = this;
-    this.setStyle(style.active);
-
-    openCountryPanel(countryName, iso2, iso3);
+    this.setStyle(STYLE_ACTIVE);
+    openCountryPanel(name, iso2);
   });
 }
 
-/* ══════════════════════════════════════════════════════
-   TOOLTIP HTML
-══════════════════════════════════════════════════════ */
-function buildTooltipHTML(name, iso2) {
-  const flag = iso2 ? getFlagEmoji(iso2) : '🏳';
-  return `<strong>${flag} ${name}</strong>`;
-}
-
-function getFlagEmoji(iso2) {
-  // Convierte código ISO-2 en emoji de bandera
-  return iso2
-    .toUpperCase()
-    .split('')
-    .map(c => String.fromCodePoint(c.charCodeAt(0) + 127397))
-    .join('');
-}
-
-/* ══════════════════════════════════════════════════════
-   OFFCANVAS: APERTURA Y CARGA DE DATOS
-══════════════════════════════════════════════════════ */
-function openCountryPanel(name, iso2, iso3) {
-  const flag = iso2 ? getFlagEmoji(iso2) : '🏳';
-
-  // Actualizar título del panel
-  document.getElementById('panel-flag').textContent        = flag;
+/* ══════════════════════════════════════════════
+   OFFCANVAS — Abrir panel y cargar datos
+══════════════════════════════════════════════ */
+function openCountryPanel(name, iso2) {
+  /* Actualizar encabezado */
+  document.getElementById('panel-flag').textContent         = iso2 ? toFlagEmoji(iso2) : '🏳';
   document.getElementById('panel-country-name').textContent = name;
 
-  // Mostrar spinner, ocultar el resto
+  /* Mostrar spinner */
   setPanelState('loading');
 
-  // Abrir Offcanvas de Bootstrap
-  if (!countryPanel) {
-    countryPanel = new bootstrap.Offcanvas(
+  /* Instanciar Offcanvas una sola vez */
+  if (!panelInstance) {
+    panelInstance = new bootstrap.Offcanvas(
       document.getElementById('countryPanel'),
       { scroll: true, backdrop: false }
     );
   }
-  countryPanel.show();
+  panelInstance.show();
 
-  // Consultar Wikidata por nombre de país
-  fetchCountryData(name, iso2);
+  /* Consultar Wikidata */
+  loadWikidataForCountry(name, iso2);
 }
 
-/* ══════════════════════════════════════════════════════
-   WIKIBASE REST API — Búsqueda + Detalle
-══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   WIKIDATA — Búsqueda en 2 pasos
+══════════════════════════════════════════════ */
 
-/**
- * Paso 1: Buscar el QID del país en Wikidata por nombre.
- */
-async function fetchCountryData(name, iso2) {
-  try {
-    // Búsqueda por etiqueta en español y luego inglés
-    const searchUrl = `${CONFIG.wikidataApi}/items?search=${encodeURIComponent(name)}&language=en&limit=1`;
-    const res = await fetch(searchUrl);
+/* Paso A: buscar QID por nombre */
+function loadWikidataForCountry(name, iso2) {
+  var url = WIKIDATA_API + '/items?' + new URLSearchParams({
+    search: name, language: 'en', limit: 1
+  });
 
-    if (!res.ok) throw new Error(`Search HTTP ${res.status}`);
-    const results = await res.json();
-
-    if (!results || results.length === 0) {
-      throw new Error('No se encontró el país en Wikidata.');
-    }
-
-    const qid = results[0].id;
-    await fetchItemDetails(qid, name, iso2);
-
-  } catch (err) {
-    console.warn('[MapaPolitico] Wikidata search fallback por ISO:', err.message);
-    // Fallback: mostrar datos mínimos del GeoJSON
-    renderMinimalPanel(name, iso2);
-  }
+  fetch(url)
+    .then(function(r) {
+      if (!r.ok) throw new Error('Search ' + r.status);
+      return r.json();
+    })
+    .then(function(results) {
+      if (!results || results.length === 0) throw new Error('sin QID');
+      return results[0].id;
+    })
+    .then(function(qid) {
+      return fetch(WIKIDATA_API + '/entities/items/' + qid)
+        .then(function(r) {
+          if (!r.ok) throw new Error('Item ' + r.status);
+          return r.json();
+        })
+        .then(function(item) {
+          return buildPanel(item, qid);
+        });
+    })
+    .catch(function(err) {
+      console.warn('[MapaPolitico] Wikidata:', err.message);
+      renderFallback(name, iso2);
+    });
 }
 
-/**
- * Paso 2: Obtener el ítem completo por QID.
- */
-async function fetchItemDetails(qid, name, iso2) {
-  try {
-    const res = await fetch(`${CONFIG.wikidataApi}/entities/items/${qid}`);
-    if (!res.ok) throw new Error(`Item HTTP ${res.status}`);
-    const item = await res.json();
+/* Paso B: construir el panel con datos del ítem */
+function buildPanel(item, qid) {
+  var statements = item.statements || {};
+  var labels     = item.labels     || {};
+  var offName    = (labels.es && labels.es.value) || (labels.en && labels.en.value) || '—';
 
-    await renderPanel(item, qid, name, iso2);
+  /* Resolver propiedades (pueden ser QIDs o valores directos) */
+  Promise.all([
+    resolveProp(statements, WIKIDATA_PROPS.govtForm),
+    resolveProp(statements, WIKIDATA_PROPS.headOfState),
+    resolveProp(statements, WIKIDATA_PROPS.headOfGovt),
+    resolveProp(statements, WIKIDATA_PROPS.capital),
+    resolveProp(statements, WIKIDATA_PROPS.officialLang),
+    resolvePopulation(statements),
+  ]).then(function(values) {
+    var rows = [
+      { label: 'Nombre oficial',    val: offName    },
+      { label: 'Forma de gobierno', val: values[0]  },
+      { label: 'Jefe de Estado',    val: values[1]  },
+      { label: 'Jefe de Gobierno',  val: values[2]  },
+      { label: 'Capital',           val: values[3]  },
+      { label: 'Idioma oficial',    val: values[4]  },
+      { label: 'Población',         val: values[5]  },
+    ];
 
-  } catch (err) {
-    console.error('[MapaPolitico] Error obteniendo ítem:', err);
-    renderMinimalPanel(name, iso2);
-  }
+    var list = document.getElementById('panel-data-list');
+    list.innerHTML = rows
+      .filter(function(r) { return r.val && r.val !== '—'; })
+      .map(function(r) {
+        return '<li class="list-group-item">' +
+          '<span class="label">' + esc(r.label) + '</span>' +
+          '<span class="value">' + esc(r.val)   + '</span>' +
+          '</li>';
+      }).join('');
+
+    var lnk = document.getElementById('panel-wikidata-link');
+    lnk.href        = 'https://www.wikidata.org/wiki/' + qid;
+    lnk.textContent = qid;
+
+    setPanelState('content');
+  });
 }
 
-/* ══════════════════════════════════════════════════════
-   RENDERIZADO DEL PANEL
-══════════════════════════════════════════════════════ */
-async function renderPanel(item, qid, name, iso2) {
-  const statements = item.statements || {};
-  const labels     = item.labels     || {};
+function renderFallback(name, iso2) {
+  var list = document.getElementById('panel-data-list');
+  list.innerHTML =
+    '<li class="list-group-item"><span class="label">País</span>' +
+    '<span class="value">' + esc(name) + '</span></li>' +
+    (iso2 ? '<li class="list-group-item"><span class="label">ISO</span>' +
+    '<span class="value">' + esc(iso2) + '</span></li>' : '');
 
-  // Extraer etiqueta oficial
-  const officialName = labels.es?.value || labels.en?.value || name;
-
-  // Resolver valores de propiedades relevantes
-  const rows = [
-    { label: 'Nombre oficial', value: officialName },
-    { label: 'Forma de gobierno', value: await resolveProperty(statements, CONFIG.props.govtForm) },
-    { label: 'Jefe de Estado',    value: await resolveProperty(statements, CONFIG.props.headOfState) },
-    { label: 'Jefe de Gobierno',  value: await resolveProperty(statements, CONFIG.props.headOfGovt) },
-    { label: 'Capital',           value: await resolveProperty(statements, CONFIG.props.capital) },
-    { label: 'Idioma oficial',    value: await resolveProperty(statements, CONFIG.props.officialLangs) },
-    { label: 'Población',         value: resolvePopulation(statements) },
-    { label: 'Código ISO',        value: iso2 || '—' },
-  ];
-
-  // Construir lista HTML
-  const list = document.getElementById('panel-data-list');
-  list.innerHTML = rows
-    .filter(r => r.value && r.value !== '—')
-    .map(r => `
-      <li class="list-group-item">
-        <span class="label">${r.label}</span>
-        <span class="value">${r.value}</span>
-      </li>
-    `).join('');
-
-  // Actualizar link a Wikidata
-  const link = document.getElementById('panel-wikidata-link');
-  link.href = `https://www.wikidata.org/wiki/${qid}`;
-  link.textContent = qid;
-
+  var lnk = document.getElementById('panel-wikidata-link');
+  lnk.href        = 'https://www.wikidata.org/w/index.php?search=' + encodeURIComponent(name);
+  lnk.textContent = 'Buscar en Wikidata';
   setPanelState('content');
 }
 
-/**
- * Fallback: panel con datos mínimos del GeoJSON.
- */
-function renderMinimalPanel(name, iso2) {
-  const flag = iso2 ? getFlagEmoji(iso2) : '';
-  const list = document.getElementById('panel-data-list');
-  list.innerHTML = `
-    <li class="list-group-item">
-      <span class="label">País</span>
-      <span class="value">${flag} ${name}</span>
-    </li>
-    <li class="list-group-item">
-      <span class="label">Código ISO</span>
-      <span class="value">${iso2 || '—'}</span>
-    </li>
-  `;
+/* ══════════════════════════════════════════════
+   HELPERS — Wikidata
+══════════════════════════════════════════════ */
 
-  document.getElementById('panel-wikidata-link').href =
-    `https://www.wikidata.org/w/index.php?search=${encodeURIComponent(name)}`;
+function resolveProp(statements, propId) {
+  var prop = statements[propId];
+  if (!prop || !prop.length) return Promise.resolve('—');
 
-  setPanelState('content');
-}
+  var val     = prop[0] && prop[0].value;
+  if (!val) return Promise.resolve('—');
 
-/* ══════════════════════════════════════════════════════
-   HELPERS: RESOLUCIÓN DE PROPIEDADES WIKIDATA
-══════════════════════════════════════════════════════ */
+  var content = val.content;
 
-/**
- * Resuelve el primer valor de una propiedad.
- * Si el valor es un QID (entity-id), hace una segunda consulta para obtener la etiqueta.
- */
-async function resolveProperty(statements, propId) {
-  const prop = statements[propId];
-  if (!prop || prop.length === 0) return '—';
+  /* Escalar directo */
+  if (typeof content === 'string') return Promise.resolve(content);
 
-  const firstStatement = prop[0];
-  const datavalue = firstStatement?.value;
+  /* Cantidad numérica */
+  if (content && content.amount) return Promise.resolve(content.amount);
 
-  if (!datavalue) return '—';
-
-  // Valor de tipo "value" directo (string, monolingualtext, etc.)
-  if (typeof datavalue === 'string') return datavalue;
-  if (datavalue.content && typeof datavalue.content === 'string') return datavalue.content;
-
-  // Valor de tipo entity-id (QID) → resolver etiqueta
-  const qid = datavalue?.content?.id || datavalue?.id;
-  if (qid && qid.startsWith('Q')) {
-    return await fetchLabel(qid);
+  /* Entity-id (QID) → resolver etiqueta */
+  var qid = content && content.id;
+  if (qid && typeof qid === 'string' && qid[0] === 'Q') {
+    return fetch(WIKIDATA_API + '/entities/items/' + qid + '/labels')
+      .then(function(r) { return r.ok ? r.json() : {}; })
+      .then(function(lbls) {
+        return (lbls.es && lbls.es.value) || (lbls.en && lbls.en.value) || qid;
+      })
+      .catch(function() { return qid; });
   }
 
-  return '—';
+  return Promise.resolve('—');
 }
 
-/**
- * Obtiene la etiqueta en español o inglés de un QID.
- */
-async function fetchLabel(qid) {
-  try {
-    const res = await fetch(`${CONFIG.wikidataApi}/entities/items/${qid}/labels`);
-    if (!res.ok) return qid;
-    const labels = await res.json();
-    return labels.es?.value || labels.en?.value || qid;
-  } catch {
-    return qid;
-  }
-}
-
-/**
- * Resuelve la población con formato localizado.
- */
 function resolvePopulation(statements) {
-  const prop = statements[CONFIG.props.population];
-  if (!prop || prop.length === 0) return '—';
+  var prop = statements[WIKIDATA_PROPS.population];
+  if (!prop || !prop.length) return Promise.resolve('—');
 
-  // Tomar el valor más reciente (último en el array suele ser el más actualizado)
-  const sorted = [...prop].sort((a, b) => {
-    const tA = a?.qualifiers?.P585?.[0]?.value?.content?.time || '';
-    const tB = b?.qualifiers?.P585?.[0]?.value?.content?.time || '';
+  /* Ordenar por fecha del dato (P585) descendente */
+  var sorted = prop.slice().sort(function(a, b) {
+    var tA = (a.qualifiers && a.qualifiers.P585 &&
+              a.qualifiers.P585[0] && a.qualifiers.P585[0].value &&
+              a.qualifiers.P585[0].value.content &&
+              a.qualifiers.P585[0].value.content.time) || '';
+    var tB = (b.qualifiers && b.qualifiers.P585 &&
+              b.qualifiers.P585[0] && b.qualifiers.P585[0].value &&
+              b.qualifiers.P585[0].value.content &&
+              b.qualifiers.P585[0].value.content.time) || '';
     return tB.localeCompare(tA);
   });
 
-  const val = sorted[0]?.value?.content;
-  if (typeof val === 'number') {
-    return val.toLocaleString('es-AR');
+  var amount = sorted[0] && sorted[0].value && sorted[0].value.content && sorted[0].value.content.amount;
+  if (amount !== undefined && amount !== null) {
+    var n = parseInt(amount, 10);
+    return Promise.resolve(isNaN(n) ? '—' : n.toLocaleString('es-AR'));
   }
-  return '—';
+  return Promise.resolve('—');
 }
 
-/* ══════════════════════════════════════════════════════
-   CONTROL DE ESTADOS DEL PANEL
-══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   HELPERS — UI
+══════════════════════════════════════════════ */
+
 function setPanelState(state) {
   document.getElementById('panel-loading').classList.toggle('d-none', state !== 'loading');
   document.getElementById('panel-content').classList.toggle('d-none', state !== 'content');
   document.getElementById('panel-error').classList.toggle('d-none',   state !== 'error');
 }
 
-/* ══════════════════════════════════════════════════════
-   ERROR EN EL MAPA
-══════════════════════════════════════════════════════ */
-function showMapError(msg) {
-  const el = document.createElement('div');
-  el.className = 'alert alert-danger position-absolute top-50 start-50 translate-middle';
-  el.style.zIndex = 9999;
-  el.textContent = msg;
-  document.getElementById('map').appendChild(el);
+function toFlagEmoji(iso2) {
+  return iso2.toUpperCase().split('').map(function(c) {
+    return String.fromCodePoint(c.charCodeAt(0) + 127397);
+  }).join('');
 }
 
-/* ══════════════════════════════════════════════════════
-   ARRANQUE
-══════════════════════════════════════════════════════ */
-loadGeoJSON();
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}

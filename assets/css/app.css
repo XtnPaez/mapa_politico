@@ -1,103 +1,122 @@
-/* ============================================================
+/* ================================================================
    Mapa Político — app.css
-   Estilos de layout. El mapa ocupa el espacio central completo.
-   ============================================================ */
+   Layout principal. El mapa ocupa el espacio central completo,
+   ajustado entre la navbar fixed-top y el footer sticky.
+   ================================================================ */
 
-/* ── Variables de diseño ─────────────────────────────── */
+/* ── Variables ──────────────────────────────────────────── */
 :root {
-  --navbar-height: 56px;
-  --footer-height: 40px;
-  --map-bg: #1a1a2e;
+  --navbar-height: 56px;   /* Alto real de .navbar fixed-top */
+  --footer-height: 40px;   /* Alto real del footer           */
 }
 
-/* ── Reset de scroll global ──────────────────────────── */
+/* ── Base: sin scroll en el viewport ───────────────────── */
 html,
 body {
   height: 100%;
-  overflow: hidden; /* Prevenimos scroll en el viewport principal */
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-/* ── Mapa: ocupa todo el espacio central disponible ───── */
+/* ── Estructura de columna flex ─────────────────────────── */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Zona central: empuja el footer al fondo ─────────────── */
+#main-content {
+  flex: 1 1 auto;           /* Ocupa TODO el espacio disponible */
+  padding-top: var(--navbar-height);  /* Respeta la navbar fixed-top */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── El mapa: altura explícita y garantizada ─────────────── */
+/*
+   Usamos height con calc() como valor de seguridad,
+   pero con flex: 1 en el padre esto debería resolverse solo.
+   Doble estrategia para máxima compatibilidad.
+*/
 #map {
   flex: 1 1 auto;
   width: 100%;
+  /* Fallback explícito por si flex falla en algún browser */
   height: calc(100vh - var(--navbar-height) - var(--footer-height));
-  background-color: var(--map-bg);
-  z-index: 1;
+  min-height: 200px;         /* Nunca colapsa a 0px             */
+  background-color: #e8e0d5; /* Color de fondo OSM mientras carga */
 }
 
-/* ── Estilos de países en el mapa ────────────────────── */
-.country-default {
-  fill: #4a6fa5;
-  fill-opacity: 0.75;
-  stroke: #2c3e50;
-  stroke-weight: 0.5;
+/* ── Footer sticky ──────────────────────────────────────── */
+footer.footer {
+  flex-shrink: 0;
+  height: var(--footer-height);
+  display: flex;
+  align-items: center;
 }
 
-.country-hover {
-  fill: #e8a838;
-  fill-opacity: 0.9;
-  stroke: #c0392b;
-  stroke-weight: 1.5;
-  cursor: pointer;
-}
+/* ════════════════════════════════════════════════════════
+   ESTILOS DEL MAPA — Capas GeoJSON
+   ════════════════════════════════════════════════════ */
 
-/* ── Tooltip personalizado de Leaflet ────────────────── */
+/* ── Tooltip de país (Leaflet) ──────────────────────────── */
 .leaflet-tooltip.country-tooltip {
-  background: rgba(20, 20, 40, 0.92);
-  border: 1px solid #4a6fa5;
-  border-radius: 6px;
-  color: #f0f0f0;
+  background: rgba(15, 15, 30, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  color: #f4f4f4;
   font-size: 0.82rem;
-  padding: 5px 10px;
+  font-weight: 500;
+  padding: 4px 10px;
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
 }
 
+/* Ocultar la flecha del tooltip */
 .leaflet-tooltip.country-tooltip::before {
-  display: none; /* Ocultamos la flecha del tooltip */
+  display: none;
 }
 
-/* ── Offcanvas: estilo del panel lateral ─────────────── */
+/* ════════════════════════════════════════════════════════
+   OFFCANVAS — Panel lateral de detalle
+   ════════════════════════════════════════════════════ */
 #countryPanel {
   width: 340px;
-  max-width: 90vw;
+  max-width: 92vw;
 }
 
 #countryPanel .offcanvas-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 #panel-data-list .list-group-item {
-  padding: 0.65rem 0;
+  padding: 0.6rem 0.25rem;
   border-left: none;
   border-right: none;
-  border-color: #e9ecef;
 }
 
 #panel-data-list .list-group-item .label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #6c757d;
   display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6c757d;
+  margin-bottom: 1px;
 }
 
 #panel-data-list .list-group-item .value {
-  font-size: 0.95rem;
+  font-size: 0.93rem;
   font-weight: 500;
   color: #212529;
 }
 
-/* ── Footer: altura fija mínima ──────────────────────── */
-.footer {
-  height: var(--footer-height);
-  flex-shrink: 0;
-}
-
-/* ── Responsive: mobile ──────────────────────────────── */
+/* ── Responsive mobile ──────────────────────────────────── */
 @media (max-width: 576px) {
   #countryPanel {
     width: 100vw;
+    max-width: 100vw;
   }
 }
