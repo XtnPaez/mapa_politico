@@ -1,0 +1,44 @@
+# ════════════════════════════════════════
+#  Mapa Político — .gitignore
+# ════════════════════════════════════════
+
+# ── PHP ──────────────────────────────────
+*.log
+*.cache
+/vendor/
+composer.lock
+*.env
+.env
+.env.*
+config/local.php
+
+# ── Sistema operativo ────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
+*~
+
+# ── Editores e IDEs ──────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+nbproject/
+
+# ── Node / NPM (si se usa para tooling) ──
+node_modules/
+npm-debug.log*
+yarn-error.log
+package-lock.json
+
+# ── Assets locales generados ─────────────
+# (Bootstrap local se versiona, pero no builds intermedios)
+assets/css/*.map
+assets/js/*.map
+
+# ── Archivos temporales del servidor ──────
+/tmp/
+.htpasswd

@@ -1,0 +1,103 @@
+/* ============================================================
+   Mapa Político — app.css
+   Estilos de layout. El mapa ocupa el espacio central completo.
+   ============================================================ */
+
+/* ── Variables de diseño ─────────────────────────────── */
+:root {
+  --navbar-height: 56px;
+  --footer-height: 40px;
+  --map-bg: #1a1a2e;
+}
+
+/* ── Reset de scroll global ──────────────────────────── */
+html,
+body {
+  height: 100%;
+  overflow: hidden; /* Prevenimos scroll en el viewport principal */
+}
+
+/* ── Mapa: ocupa todo el espacio central disponible ───── */
+#map {
+  flex: 1 1 auto;
+  width: 100%;
+  height: calc(100vh - var(--navbar-height) - var(--footer-height));
+  background-color: var(--map-bg);
+  z-index: 1;
+}
+
+/* ── Estilos de países en el mapa ────────────────────── */
+.country-default {
+  fill: #4a6fa5;
+  fill-opacity: 0.75;
+  stroke: #2c3e50;
+  stroke-weight: 0.5;
+}
+
+.country-hover {
+  fill: #e8a838;
+  fill-opacity: 0.9;
+  stroke: #c0392b;
+  stroke-weight: 1.5;
+  cursor: pointer;
+}
+
+/* ── Tooltip personalizado de Leaflet ────────────────── */
+.leaflet-tooltip.country-tooltip {
+  background: rgba(20, 20, 40, 0.92);
+  border: 1px solid #4a6fa5;
+  border-radius: 6px;
+  color: #f0f0f0;
+  font-size: 0.82rem;
+  padding: 5px 10px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-tooltip.country-tooltip::before {
+  display: none; /* Ocultamos la flecha del tooltip */
+}
+
+/* ── Offcanvas: estilo del panel lateral ─────────────── */
+#countryPanel {
+  width: 340px;
+  max-width: 90vw;
+}
+
+#countryPanel .offcanvas-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#panel-data-list .list-group-item {
+  padding: 0.65rem 0;
+  border-left: none;
+  border-right: none;
+  border-color: #e9ecef;
+}
+
+#panel-data-list .list-group-item .label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  display: block;
+}
+
+#panel-data-list .list-group-item .value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #212529;
+}
+
+/* ── Footer: altura fija mínima ──────────────────────── */
+.footer {
+  height: var(--footer-height);
+  flex-shrink: 0;
+}
+
+/* ── Responsive: mobile ──────────────────────────────── */
+@media (max-width: 576px) {
+  #countryPanel {
+    width: 100vw;
+  }
+}
