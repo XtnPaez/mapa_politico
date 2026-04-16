@@ -11,6 +11,11 @@
 }
 
 /* ── Reset ── */
+*,
+*:focus,
+*:hover {
+  outline: none;
+}
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg-dark); font-family: system-ui, sans-serif; }
 
@@ -48,6 +53,21 @@ html, body { height: 100%; background: var(--bg-dark); font-family: system-ui, s
   color: var(--muted);
 }
 #main-footer a { color: var(--muted); text-decoration: none; }
+
+/* ── Pisa el estilo base del tooltip de Leaflet ── */
+.leaflet-tooltip {
+  background: rgba(13, 17, 23, 0.88) !important;
+  border: none !important;
+  border-radius: 5px !important;
+  color: #e6edf3 !important;
+  font-size: 0.8rem !important;
+  padding: 4px 9px !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+.leaflet-tooltip::before {
+  display: none !important;
+}
 
 /* ── Tooltip hover ── */
 .country-tooltip {
@@ -137,6 +157,17 @@ html, body { height: 100%; background: var(--bg-dark); font-family: system-ui, s
 /* ── Responsive ── */
 @media (max-width: 576px) {
   #country-panel { width: 100vw !important; }
+}
+
+/* ── Eliminar borde del SVG animado de Leaflet ── */
+.leaflet-zoom-animated {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.leaflet-overlay-pane svg {
+  outline: none !important;
+  border: none !important;
 }
 
 /* ── Leyenda ── */

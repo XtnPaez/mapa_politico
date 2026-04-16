@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', function () {
     maxZoom: 10,
     zoomControl: true,
     worldCopyJump: true,
+    zoomAnimation: false,
+    markerZoomAnimation: false,
   });
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -198,12 +200,12 @@ function selectCountry(layer, name, iso) {
   State.selectedLayer = layer;
   styleSelected(layer);
 
-  // Centrar en el país con flyTo — sin ningún frame de bounding box
+  // Centrar en el país sin animación (la animación genera el recuadro SVG visible)
   var bounds  = layer.getBounds();
   var center  = bounds.getCenter();
   var mapSize = State.map.getSize();
   var zoom    = State.map.getBoundsZoom(bounds, false, L.point(mapSize.x - 380, mapSize.y));
-  State.map.flyTo(center, Math.min(zoom, 6), { animate: true, duration: 0.6 });
+  State.map.setView(center, Math.min(zoom, 6), { animate: false });
 
   // Abrir panel con loading
   document.getElementById('panel-title').textContent = name;
