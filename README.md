@@ -1,157 +1,133 @@
-# Mapa Político
+# 🌍 Mapa Político Mundial
 
-![PHP](https://img.shields.io/badge/PHP-8%2B-777BB4?style=flat-square&logo=php&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=flat-square&logo=bootstrap&logoColor=white)
-![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-199900?style=flat-square&logo=leaflet&logoColor=white)
-![Wikidata](https://img.shields.io/badge/Wikidata-REST%20API-006699?style=flat-square&logo=wikidata&logoColor=white)
+Visualizador cartográfico interactivo que muestra formas de gobierno, jefes de estado y datos relevantes de todos los países del mundo, consumidos en tiempo real desde la **Wikidata REST API**.
 
-Visualizador cartográfico interactivo de formas de gobierno y datos políticos por país, consumidos en tiempo real desde la **Wikibase REST API de Wikidata**.
+**Demo:** [https://xtnpaez.github.io/mapa_politico](https://xtnpaez.github.io/mapa_politico)
 
 ---
 
 ## Stack Tecnológico
 
-| Capa       | Tecnología                          |
-|------------|-------------------------------------|
-| Backend    | PHP 8+ (vanilla, sin frameworks)    |
-| Frontend   | Bootstrap 5.3 + JavaScript ES6+     |
-| Mapas      | Leaflet 1.9.4 (~42KB)               |
-| Datos      | Wikibase REST API v1 (Wikidata)     |
-| Tiles      | OpenStreetMap                       |
-| GeoJSON    | Natural Earth 110m (via CloudFront) |
+| Capa | Tecnología |
+|---|---|
+| Mapas | [Leaflet 1.9](https://leafletjs.com/) |
+| UI / Layout | [Bootstrap 5.3](https://getbootstrap.com/) + Bootstrap Icons |
+| Datos | [Wikidata REST API](https://www.wikidata.org/wiki/Wikidata:REST_API) |
+| GeoJSON | [Natural Earth via datasets/geo-countries](https://github.com/datasets/geo-countries) |
+| Hosting | GitHub Pages (100% estático) |
+| Lenguaje | JavaScript ES6+ (módulos nativos) |
 
 ---
 
-## Estructura del Proyecto
+## Arquitectura
 
 ```
 mapa_politico/
-├── index.php                  ← Entrada principal
-├── php/
-│   ├── navbar.php             ← Módulo navbar (independiente)
-│   └── footer.php             ← Módulo footer (independiente)
-├── assets/
-│   ├── css/
-│   │   └── mapa.css           ← Estilos del proyecto
-│   ├── js/
-│   │   └── mapa.js            ← Lógica Leaflet + Wikidata
-│   └── data/
-│       └── gov_forms.json     ← ISO A2 → categoría de gobierno (estático)
-├── .gitignore
-└── README.md
+├── index.html                  # Punto de entrada
+├── css/
+│   └── main.css                # Estilos globales
+├── js/
+│   ├── app.js                  # Bootstrap de la app (entry point)
+│   ├── map.js                  # Inicialización Leaflet + eventos
+│   ├── wikidata.js             # Servicio Wikidata REST API
+│   └── ui.js                  # Renderizado del panel lateral
+└── components/
+    ├── navbar.html             # Navbar (módulo independiente)
+    └── footer.html             # Footer (módulo independiente)
+```
+
+### Modularización sin PHP
+
+Los componentes `navbar.html` y `footer.html` son módulos independientes cargados dinámicamente mediante `fetch()` en `app.js`. Esto replica la modularidad del `include()` de PHP sin necesitar servidor.
+
+```js
+await loadComponent('navbar-placeholder', 'components/navbar.html');
 ```
 
 ---
 
-## Arquitectura de Layout
+## Funcionalidades
 
-```
-┌─────────────────────────────────────────┐  ← fixed-top (52px)
-│              NAVBAR                     │
-├─────────────────────────────────────────┤
-│                                         │
-│                                         │
-│           MAPA (Leaflet)                │  ← position: fixed
-│    top: 52px | bottom: 36px             │     cubre zona central
-│                                         │
-│                                         │
-├─────────────────────────────────────────┤
-│              FOOTER                     │  ← fixed-bottom (36px)
-└─────────────────────────────────────────┘
-```
+### Hover — Tooltip
+Al pasar el cursor sobre un país se muestra un tooltip con:
+- Bandera emoji
+- Nombre del país
+- Indicación de que se puede hacer clic
 
-`#map` está `position: fixed` con `top` y `bottom` exactos. Sin wrappers intermedios.
-
----
-
-## Orden de Dependencias CSS/JS
-
-```html
-<!-- CSS -->
-<link rel="stylesheet" href="leaflet.css">       <!-- 1. Leaflet CSS siempre primero -->
-<link rel="stylesheet" href="bootstrap.min.css"> <!-- 2. Bootstrap -->
-<link rel="stylesheet" href="assets/css/mapa.css"> <!-- 3. Estilos propios -->
-
-<!-- JS -->
-<script src="bootstrap.bundle.min.js"></script>  <!-- 1. Bootstrap (incluye Popper) -->
-<script src="leaflet.js"></script>               <!-- 2. Leaflet DESPUÉS de su CSS -->
-<script src="assets/js/mapa.js"></script>        <!-- 3. Lógica propia -->
-```
-
-> ⚠️ Sin `integrity` en los tags `<script>` y `<link>` — los hashes causan bloqueo si no coinciden exactamente con la versión del CDN.
-
----
-
-## Colores por Forma de Gobierno
-
-Los polígonos se colorean al cargar desde `gov_forms.json` — sin requests a Wikidata.
-
-| Categoría                | Color     |
-|--------------------------|-----------|
-| República presidencial   | `#a1cfdd` |
-| República parlamentaria  | `#cddc49` |
-| República federal        | `#efce97` |
-| Monarquía constitucional | `#cb7e94` |
-| Monarquía absoluta       | `#e94b30` |
-| Estado partido único     | `#5e0032` |
-| Teocracia                | `#fee659` |
-| Sin datos                | `#6f6456` |
-
-El color del badge en el panel lateral usa el mismo valor que el polígono en el mapa.
+### Click — Panel lateral (Offcanvas)
+Al seleccionar un país se despliega un panel desde la izquierda con:
+- Forma de gobierno
+- Jefe de Estado
+- Jefe de Gobierno
+- Capital
+- Población y superficie
+- Moneda
+- Idioma(s) oficial(es)
+- Enlace directo a Wikidata
 
 ---
 
 ## API de Wikidata
 
-**Base URL:** `https://www.wikidata.org/w/rest.php/wikibase/v1`
+Se usa la **Wikibase REST API** (no la API legacy):
 
-| Endpoint                          | Uso                            |
-|-----------------------------------|--------------------------------|
-| `GET /entities/items/{QID}`       | Datos completos de un país     |
-| `GET /entities/items/{QID}?_fields=labels` | Resolver QID a etiqueta |
-
-### Propiedades consultadas
-
-| Propiedad         | ID     | Nota                                      |
-|-------------------|--------|-------------------------------------------|
-| Capital           | P36    | QID → se resuelve a etiqueta              |
-| Jefe de Estado    | P35    | QID → se resuelve a etiqueta              |
-| Jefe de Gobierno  | P6     | QID → se resuelve a etiqueta              |
-| Forma de Gobierno | P122   | Referencial — se usa `gov_forms.json`     |
-| Población         | P1082  | `content.amount` (objeto quantity)        |
-| Superficie        | P2046  | `content.amount` (objeto quantity)        |
-| Moneda            | P38    | QID → se resuelve a etiqueta              |
-| Idioma oficial    | P37    | QID → se resuelve a etiqueta              |
-| Partido político  | P102   | Del ítem del jefe de gobierno (2do fetch) |
-
-### Criterio de valor vigente
-
-Wikidata puede tener múltiples valores históricos por propiedad. Se usa:
-1. Statement con `rank: "preferred"` si existe
-2. Si no, el **último** de la lista (más recientemente agregado)
-
----
-
-## Niveles de Interacción
-
-1. **Hover** → Tooltip oscuro con nombre del país (sin borde — `outline: none` global)
-2. **Click** → Offcanvas lateral izquierdo con datos de Wikidata + leyenda de colores
-
----
-
-## Fix crítico: el recuadro de Leaflet
-
-El SVG animado de Leaflet genera un `outline` visible al hacer hover/click sobre los polígonos. Se elimina con:
-
-```css
-*, *:focus, *:hover {
-  outline: none;
-}
 ```
->
+Base URL: https://www.wikidata.org/w/rest.php/wikibase/v1
+```
+
+Flujo de consulta por país:
+1. El GeoJSON provee el código ISO A2 del país (ej: `AR`)
+2. Se ejecuta una consulta SPARQL para obtener el QID (ej: `Q414`)
+3. Se llama a `/entities/items/{QID}` para obtener el ítem completo
+4. Se resuelven en paralelo las labels de entidades relacionadas (jefe de estado, capital, etc.)
+
 ---
 
-## Repositorio
+## Deploy en GitHub Pages
 
-[github.com/XtnPaez/mapa_politico](https://github.com/XtnPaez/mapa_politico)
+1. Hacer fork o clonar el repositorio
+2. Ir a **Settings → Pages**
+3. Source: `Deploy from a branch` → `main` → `/ (root)`
+4. GitHub Pages servirá `index.html` automáticamente
+
+No se necesita configuración adicional. No hay backend, no hay build step.
+
+---
+
+## Desarrollo local
+
+Al usar ES Modules (`type="module"`), los navegadores requieren un servidor HTTP para cargar los archivos. Opciones:
+
+```bash
+# Python (incluido en macOS/Linux)
+python3 -m http.server 8080
+
+# Node.js
+npx serve .
+
+# VS Code
+# Instalar extensión "Live Server" y hacer clic en "Go Live"
+```
+
+Luego abrir `http://localhost:8080`.
+
+> ⚠️ No abrir `index.html` directamente con `file://` — los módulos JS fallarán por política CORS del navegador.
+
+---
+
+## Roadmap
+
+- [ ] Colorización del mapa por forma de gobierno (república, monarquía, etc.)
+- [ ] Búsqueda de países en la navbar
+- [ ] Filtros por región o tipo de gobierno
+- [ ] Modal "Acerca de" con información del proyecto
+- [ ] Caché local con `sessionStorage` para reducir llamadas a la API
+- [ ] Soporte offline con Service Worker
+
+---
+
+## Licencia
+
+MIT © [XtnPaez](https://github.com/XtnPaez)
+
+Datos: [Wikidata](https://www.wikidata.org) (CC0) · GeoJSON: [Natural Earth](https://www.naturalearthdata.com/) (dominio público)
