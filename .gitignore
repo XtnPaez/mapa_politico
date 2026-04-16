@@ -1,44 +1,46 @@
-# ════════════════════════════════════════
-#  Mapa Político — .gitignore
-# ════════════════════════════════════════
+# ══════════════════════════════════════
+# .gitignore — Mapa Político
+# Entorno: PHP vanilla + JS (ES6+)
+# ══════════════════════════════════════
 
-# ── PHP ──────────────────────────────────
+# ── PHP ────────────────────────────────
 *.log
-*.cache
 /vendor/
 composer.lock
-*.env
+
+# ── Variables de entorno ────────────────
 .env
-.env.*
-config/local.php
+.env.local
+.env.*.local
 
-# ── Sistema operativo ────────────────────
-.DS_Store
-Thumbs.db
-desktop.ini
-*.bak
-*.swp
-*~
-
-# ── Editores e IDEs ──────────────────────
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-*.code-workspace
-nbproject/
-
-# ── Node / NPM (si se usa para tooling) ──
+# ── Node / npm (si se usa para build tools)
 node_modules/
 npm-debug.log*
 yarn-error.log
-package-lock.json
 
-# ── Assets locales generados ─────────────
-# (Bootstrap local se versiona, pero no builds intermedios)
-assets/css/*.map
-assets/js/*.map
+# ── Editores e IDEs ────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.DS_Store
+Thumbs.db
 
-# ── Archivos temporales del servidor ──────
+# ── Caché y temporales ─────────────────
+/cache/
 /tmp/
-.htpasswd
+*.tmp
+*.bak
+*.orig
+
+# ── Sass / Build outputs ───────────────
+/dist/
+*.css.map
+*.js.map
+
+# ── Configuración de servidor local ───
+/config/local.php
+/config/*.local.php
