@@ -149,21 +149,7 @@ El SVG animado de Leaflet genera un `outline` visible al hacer hover/click sobre
   outline: none;
 }
 ```
-
----
-
-## Cómo ejecutar localmente
-
-```bash
-# Requiere PHP 8+
-cd mapa_politico
-php -S localhost:8000
-
-# Aplicación principal:
-# http://localhost:8000
-
-```
-
+>
 ---
 
 ## Repositorio
